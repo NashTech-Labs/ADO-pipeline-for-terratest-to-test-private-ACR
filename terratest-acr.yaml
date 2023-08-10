@@ -1,0 +1,145 @@
+name: ACR Test using terratest
+trigger: none
+# trigger:
+# schedules:
+#   - cron: "*/20 * * * *"
+#     always: true
+#     branches:
+#       include:
+#         - terratest-acr-module
+# pr: none
+
+
+pool: 
+  name: < pool name >
+  demands:
+    - agent.name -equals < self-hosted-agent-name>
+
+variables:
+  - group: Azure Credential
+
+jobs:
+- job: Build
+
+  steps:
+
+    - script: |
+        echo "This is second path", $(Build.SourcesDirectory)
+        mkdir "$(Build.SourcesDirectory)/terratest"
+        pwd
+        ls -R "$(Build.SourcesDirectory)"
+        ls -R "$(Build.SourcesDirectory)/terratest"
+        cd "$(Build.SourcesDirectory)/terratest"
+        ls -la
+      displayName: 'Create folder'
+      
+    - script: |
+        docker --version
+        echo "Before pull...."
+        docker images  
+        docker pull hello-world:latest
+        echo "After pull....."
+        docker images  
+      displayName: 'Checking Docker Version and pull image'
+
+
+
+    - task: AzureKeyVault@2
+      displayName: Get common secrets from Master KV
+      inputs:
+        azureSubscription: "provisioning"
+        KeyVaultName: "techhub"
+        SecretsFilter: "techhubsp-appid,techhubsp-appsecret,techhub-playground-compute-TenantId"
+        RunAsPreJob: false
+
+    - script: |
+        echo azure_tenant_id = "$(techhub-playground-compute-TenantId)"
+        echo azure_client_id = "$(techhubsp-appid)"
+        echo azure_client_secret = "$(techhubsp-appsecret)"
+      displayName: "Key-vault values.."
+
+    - checkout: self
+      displayName: 'Checkout terratest branch repo'
+      path: terratest
+      clean: true
+
+    - script: |
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+      displayName: 'Install Azure CLI'
+
+    - script: |
+        az --version
+        pwd
+        az login --service-principal -u $(techhubsp-appid) -p $(techhubsp-appsecret) --tenant $(techhub-playground-compute-TenantId)
+        echo "This is subscription id:=" $(ARM_SUBSCRIPTION_ID)
+        az account set --subscription $(ARM_SUBSCRIPTION_ID)
+        az account show
+      displayName: 'Check Azure CLI Version and Set up the Account'
+
+    - script: |
+        sudo apt-get update
+        sudo apt-get install -y unzip
+        curl -LO https://releases.hashicorp.com/terraform/1.5.0/terraform_1.5.0_linux_amd64.zip
+        unzip terraform_1.5.0_linux_amd64.zip
+        rm -rf terraform_1.*
+        sudo mv terraform /usr/local/bin/
+        terraform --version
+        pwd
+      displayName: 'Install Terraform'
+
+      
+    - script: |
+        curl -LO https://golang.org/dl/go1.17.2.linux-amd64.tar.gz
+        sudo tar -C /usr/local -xzf go1.17.2.linux-amd64.tar.gz
+        rm -rf go1.*
+        export GOROOT=/usr/local/go
+        export GOPATH=$(HOME)/go
+        export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
+        echo "export GOROOT=/usr/local/go" >> $(HOME)/.bashrc
+        echo "export GOPATH=$(HOME)/go" >> $(HOME)/.bashrc
+        echo "export PATH=\$GOROOT/bin:\$GOPATH/bin:\$PATH" >> $(HOME)/.bashrc
+        source $(HOME)/.bashrc
+        go version
+        pwd
+      displayName: 'Install Go'
+
+    - script: |
+
+        # Fetching values from Azure Key Vault secrets
+        azure_tenant_id=$(techhub-playground-compute-TenantId)
+        azure_client_id=$(techhubsp-appid)
+        azure_client_secret=$(techhubsp-appsecret)
+        # Exporting values as environment variables
+        export TF_VAR_azure_tenant_id="$azure_tenant_id"
+        export TF_VAR_azure_client_id="$azure_client_id"
+        export TF_VAR_azure_client_secret="$azure_client_secret"
+        # Optionally, you can print the values to verify
+        echo "TF_VAR_azure_tenant_id: $TF_VAR_azure_tenant_id"
+        echo "TF_VAR_azure_client_id: $TF_VAR_azure_client_id"
+        echo "TF_VAR_azure_client_secret: $TF_VAR_azure_client_secret"
+        # Continue with your Terratest command here
+      displayName: ' Set Environment Variables and Run Terratest'
+
+    
+    - script: | 
+          sudo apt-get update
+          sudo apt-get upgrade -y
+          sudo apt-get install build-essential -y 
+      displayName: 'Update the server'  
+
+
+    - script: |
+          export PATH=$PATH:/usr/local/go/bin
+          cd test
+          ls
+          go install github.com/gruntwork-io/terratest/modules/terraform@latest
+          go mod init github.com/terratest/ACR-module-test
+          go mod tidy -go=1.16 && go mod tidy -go=1.17 
+          ls
+          go test -v -timeout 50m
+      displayName: 'Run Terratest'
+      env:
+        TF_VAR_azure_client_id: $(techhubsp-appid)
+        TF_VAR_azure_client_secret: $(techhubsp-appsecret)
+        TF_VAR_azure_tenant_id: $(techhub-playground-compute-TenantId)
+        TF_VAR_azure_subscription_id: $(ARM_SUBSCRIPTION_ID)
