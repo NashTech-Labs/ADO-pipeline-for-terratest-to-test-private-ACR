@@ -14,3 +14,4 @@ Step 3: Simply run the pipeline from the azure pipeline UI
 
 
 
+Note:- You can  also use my terratest code to test your private ACR.
