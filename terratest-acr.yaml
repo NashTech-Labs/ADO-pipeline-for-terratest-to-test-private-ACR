@@ -55,7 +55,7 @@ jobs:
     - script: |
         echo azure_tenant_id = "$(techhub-playground-compute-TenantId)"
         echo azure_client_id = "$(techhubsp-appid)"
-        echo azure_client_secret = "$(techhubsp-appsecret)"
+        echo azure_CLIENT_SECRET = "$(techhubsp-appsecret)"
       displayName: "Key-vault values.."
 
     - checkout: self
@@ -71,8 +71,8 @@ jobs:
         az --version
         pwd
         az login --service-principal -u $(techhubsp-appid) -p $(techhubsp-appsecret) --tenant $(techhub-playground-compute-TenantId)
-        echo "This is subscription id:=" $(ARM_SUBSCRIPTION_ID)
-        az account set --subscription $(ARM_SUBSCRIPTION_ID)
+        echo "This is subscription id:=" $(SUBSCRIPTION_ID)
+        az account set --subscription $(SUBSCRIPTION_ID)
         az account show
       displayName: 'Check Azure CLI Version and Set up the Account'
 
@@ -108,15 +108,15 @@ jobs:
         # Fetching values from Azure Key Vault secrets
         azure_tenant_id=$(techhub-playground-compute-TenantId)
         azure_client_id=$(techhubsp-appid)
-        azure_client_secret=$(techhubsp-appsecret)
+        azure_CLIENT_SECRET=$(techhubsp-appsecret)
         # Exporting values as environment variables
         export TF_VAR_azure_tenant_id="$azure_tenant_id"
         export TF_VAR_azure_client_id="$azure_client_id"
-        export TF_VAR_azure_client_secret="$azure_client_secret"
+        export TF_VAR_azure_CLIENT_SECRET="$azure_CLIENT_SECRET"
         # Optionally, you can print the values to verify
         echo "TF_VAR_azure_tenant_id: $TF_VAR_azure_tenant_id"
         echo "TF_VAR_azure_client_id: $TF_VAR_azure_client_id"
-        echo "TF_VAR_azure_client_secret: $TF_VAR_azure_client_secret"
+        echo "TF_VAR_azure_CLIENT_SECRET: $TF_VAR_azure_CLIENT_SECRET"
         # Continue with your Terratest command here
       displayName: ' Set Environment Variables and Run Terratest'
 
@@ -140,6 +140,6 @@ jobs:
       displayName: 'Run Terratest'
       env:
         TF_VAR_azure_client_id: $(techhubsp-appid)
-        TF_VAR_azure_client_secret: $(techhubsp-appsecret)
+        TF_VAR_azure_CLIENT_SECRET: $(techhubsp-appsecret)
         TF_VAR_azure_tenant_id: $(techhub-playground-compute-TenantId)
-        TF_VAR_azure_subscription_id: $(ARM_SUBSCRIPTION_ID)
+        TF_VAR_azure_subscription_id: $(SUBSCRIPTION_ID)
